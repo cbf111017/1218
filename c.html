@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>權證實時分析系統</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Microsoft YaHei', Arial, sans-serif; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container { max-width: 1800px; margin: 0 auto; }
+    
+    .header {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      margin-bottom: 30px;
+      text-align: center;
+    }
+    
+    .header h1 {
+      color: #2c3e50;
+      margin-bottom: 10px;
+      font-size: 32px;
+    }
+    
+    .header p {
+      color: #7f8c8d;
+      font-size: 14px;
+    }
+    
+    .input-section {
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      margin-bottom: 30px;
+    }
+    
+    .input-section h2 {
+      color: #2c3e50;
+      margin-bottom: 15px;
+      font-size: 18px;
+      border-bottom: 3px solid #3498db;
+      padding-bottom: 10px;
+    }
+    
+    .input-group {
+      margin-bottom: 15px;
+    }
+    
+    .input-group label {
+      display: block;
+      color: #34495e;
+      font-weight: bold;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    
+    textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #bdc3c7;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      resize: vertical;
+      min-height: 150px;
+      transition: border-color 0.3s;
+    }
+    
+    textarea:focus {
+      outline: none;
+      border-color: #3498db;
+      box-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    
+    button {
+      flex: 1;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .btn-analyze {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .btn-analyze:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-clear {
+      background: #ecf0f1;
+      color: #34495e;
+    }
+    
+    .btn-clear:hover {
+      background: #bdc3c7;
+    }
+    
+    .btn-copy {
+      background: #27ae60;
+      color: white;
+      font-size: 12px;
+    }
+    
+    .btn-copy:hover {
+      background: #229954;
+    }
+    
+    .results-section {
+      display: none;
+      animation: slideIn 0.5s ease-out;
+    }
+    
+    .results-section.active {
+      display: block;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      margin-bottom: 30px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    .comparison-table th {
+      background: #2c3e50;
+      color: white;
+      padding: 14px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 13px;
+    }
+    
+    .comparison-table td {
+      padding: 12px;
+      border-bottom: 1px solid #ddd;
+      text-align: center;
+      font-size: 13px;
+    }
+    
+    .comparison-table tr:hover {
+      background: #f9f9f9;
+    }
+    
+    .comparison-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .sortable-header {
+      cursor: pointer;
+      position: relative;
+    }
+    .sortable-header::after {
+      content: '';
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      margin-top: -7px;
+      border: 5px solid transparent;
+      opacity: 0.3;
+    }
+    .sortable-header:hover::after {
+      opacity: 0.6;
+    }
+    .sortable-header.sorted-asc::after {
+      border-bottom-color: white;
+      opacity: 1;
+    }
+    .sortable-header.sorted-desc::after {
+      border-top-color: white;
+      opacity: 1;
+    }
+    
+    .warrant-code {
+      font-weight: bold;
+      color: #2980b9;
+      text-align: left;
+    }
+    
+    .warrant-name {
+      text-align: left;
+      font-size: 12px;
+      color: #555;
+    }
+    
+    .score-excellent {
+      background: #d4edda;
+      color: #155724;
+      font-weight: bold;
+      border-radius: 4px;
+      padding: 4px 8px;
+    }
+    
+    .score-good {
+      background: #cfe2ff;
+      color: #084298;
+      font-weight: bold;
+      border-radius: 4px;
+      padding: 4px 8px;
+    }
+    
+    .score-warning {
+      background: #fff3cd;
+      color: #856404;
+      font-weight: bold;
+      border-radius: 4px;
+      padding: 4px 8px;
+    }
+    
+    .score-danger {
+      background: #f8d7da;
+      color: #721c24;
+      font-weight: bold;
+      border-radius: 4px;
+      padding: 4px 8px;
+    }
+    
+    .up {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    
+    .down {
+      color: #27ae60;
+      font-weight: bold;
+    }
+    
+    .card {
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      margin-bottom: 25px;
+      border-left: 5px solid #3498db;
+    }
+    
+    .card h3 {
+      color: #2c3e50;
+      margin-bottom: 15px;
+      font-size: 18px;
+    }
+    
+    .card.excellent {
+      border-left-color: #27ae60;
+    }
+    
+    .card.warning {
+      border-left-color: #f39c12;
+    }
+    
+    .card.danger {
+      border-left-color: #e74c3c;
+    }
+    
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .metric-item {
+      background: #ecf0f1;
+      padding: 15px;
+      border-radius: 6px;
+    }
+    
+    .metric-label {
+      color: #7f8c8d;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+    
+    .metric-value {
+      color: #2c3e50;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    
+    .formula-result {
+      background: #e8f4f8;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 15px 0;
+      border-left: 4px solid #3498db;
+    }
+    
+    .formula-title {
+      font-weight: bold;
+      color: #2c3e50;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    
+    .formula-value {
+      font-size: 16px;
+      font-weight: bold;
+      color: #2980b9;
+      margin-top: 8px;
+    }
+    
+    .recommendation {
+      padding: 15px;
+      border-radius: 6px;
+      margin: 15px 0;
+      border-left: 4px solid;
+    }
+    
+    .rec-buy {
+      background: #d4edda;
+      border-left-color: #28a745;
+      color: #155724;
+    }
+    
+    .rec-hold {
+      background: #cfe2ff;
+      border-left-color: #0d6efd;
+      color: #084298;
+    }
+    
+    .rec-avoid {
+      background: #f8d7da;
+      border-left-color: #dc3545;
+      color: #721c24;
+    }
+    
+    .detail-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+    }
+    
+    .detail-table th {
+      background: #34495e;
+      color: white;
+      padding: 10px;
+      text-align: left;
+      font-size: 12px;
+    }
+    
+    .detail-table td {
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+      font-size: 12px;
+    }
+    
+    .detail-table tr:nth-child(even) {
+      background: #f9f9f9;
+    }
+    
+    .ranking {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin: 20px 0;
+    }
+    
+    .rank-item {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      text-align: center;
+      border-top: 4px solid #3498db;
+    }
+    
+    .rank-title {
+      color: #7f8c8d;
+      font-size: 12px;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+    
+    .rank-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #2980b9;
+    }
+    
+    .rank-note {
+      color: #7f8c8d;
+      font-size: 11px;
+      margin-top: 10px;
+    }
+    
+    .error-message {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      border-left: 4px solid #dc3545;
+    }
+    
+    .success-message {
+      background: #d4edda;
+      color: #155724;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      border-left: 4px solid #28a745;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #7f8c8d;
+    }
+    
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .export-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      justify-content: center;
+    }
+    
+    .export-buttons button {
+      flex: 0 1 auto;
+    }
+    
+    @media (max-width: 768px) {
+      .header h1 {
+        font-size: 24px;
+      }
+      
+      .metric-row {
+        grid-template-columns: 1fr;
+      }
+      
+      .button-group {
+        flex-direction: column;
+      }
+      
+      textarea {
+        min-height: 200px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 頭部 -->
+    <div class="header">
+      <h1>⚡ 權證實時分析系統</h1>
+      <p>專業權證分析工具 - 即時評估 | 智能決策 | 風險管理</p>
+    </div>
+
+    <!-- 輸入區域 -->
+    <div class="input-section">
+      <h2>📊 輸入權證資料</h2>
+      
+      <div class="input-group">
+        <label>貼上權證資料（支持表格、逗號分隔或空格分隔）</label>
+        <textarea id="dataInput" placeholder="範例：
+068735	一詮群益52購01	0.11	-0.03	-21.43	202	154.62	0.0600	78	36.04%價外	--	11.47	72.48	10.10
+066885	一詮元富51購01	0.15	-0.05	-25.00	125	144.09	0.0730	55	31.36%價外	--	11.12	83.61	32.50
+077418	一詮凱基51購02	0.14	-0.03	-17.65	1153	129.18	0.0850	48	23.44%價外	13.33	8.17	64.66	98.20
+
+或複製整個表格貼上"></textarea>
+      </div>
+
+      <div class="input-group" style="display: flex; align-items: center; gap: 10px; margin-top: 20px;">
+        <input type="checkbox" id="considerLiquidity" checked style="width: 18px; height: 18px; cursor: pointer;">
+        <label for="considerLiquidity" style="margin-bottom: 0; font-weight: normal; cursor: pointer;">考慮流動性 (成交量)</label>
+      </div>
+
+      <div class="button-group">
+        <button class="btn-analyze" onclick="analyzeData()">🚀 開始分析</button>
+        <button class="btn-clear" onclick="clearData()">🔄 清空</button>
+      </div>
+    </div>
+
+    <!-- 結果區域 -->
+    <div id="resultsContainer" class="results-section">
+      <div id="messageContainer"></div>
+      <div id="analysisResults"></div>
+    </div>
+  </div>
+
+  <script>
+    let tableData = [];
+    let sortState = { key: 'score', direction: 'desc' };
+
+    // --- 新增 Supabase 初始化程式碼 ---
+    const SUPABASE_URL = 'https://qqavacfhzlgdtzqhneef.supabase.co'; // 替換成您的 URL
+    const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxYXZhY2ZoemxnZHR6cWhuZWVmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjA2MTQ4NSwiZXhwIjoyMDgxNjM3NDg1fQ.2kfj_8VF4XS-NA4N5C9sSnZ9DnKCnaG2_4b4OxQNwR0'; // 重要：請替換成您的 service_role key，因為 anon key 沒有寫入權限
+    
+    let supabaseClient;
+    try {
+      const { createClient } = supabase;
+      supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+      console.log('Supabase client initialized.');
+    } catch (error) {
+      console.error('Error initializing Supabase:', error);
+    }
+    // --- 結束 ---
+
+    function parseWarrantData(input) {
+      const lines = input.trim().split('\n').filter(line => line.trim());
+      const warrants = [];
+
+      const isSingleLineFormat = lines.length > 0 && (lines[0].includes('\t') || lines[0].split(/\s+/).length > 5);
+
+      if (isSingleLineFormat) {
+        for (const line of lines) {
+          let parts = line.split('\t');
+          if (parts.length < 10) {
+            parts = line.split(/\s+/);
+          }
+          if (parts.length < 10) {
+            parts = line.split(',');
+          }
+
+          if (parts.length >= 13) {
+            try {
+              const warrant = {
+                code: parts[0].trim(),
+                name: parts[1].trim(),
+                price: parseFloat(parts[2]),
+                change: parseFloat(parts[3]),
+                changePercent: parseFloat(parts[4]),
+                volume: parseInt(parts[5]),
+                exercisePrice: parseFloat(parts[6]),
+                exerciseRatio: parseFloat(parts[7]),
+                daysLeft: parseInt(parts[8]),
+                priceStatus: parts[9].trim(),
+                spreadRatio: parts[10].trim() === '--' ? null : parseFloat(parts[10]),
+                leverage: parseFloat(parts[11]),
+                impliedVol: parseFloat(parts[12]),
+                floatingRatio: parts[13] ? parseFloat(parts[13]) : 0
+              };
+              warrants.push(warrant);
+            } catch (e) {
+              console.error('解析單行格式失敗:', line, e);
+            }
+          }
+        }
+      } else {
+        const fieldsPerWarrant = 14;
+        for (let i = 0; i <= lines.length - fieldsPerWarrant; i += fieldsPerWarrant) {
+          const chunk = lines.slice(i, i + fieldsPerWarrant);
+          const parts = chunk.map(item => item.trim());
+          
+          try {
+            const warrant = {
+              code: parts[0],
+              name: parts[1],
+              price: parseFloat(parts[2]),
+              change: parseFloat(parts[3]),
+              changePercent: parseFloat(parts[4]),
+              volume: parseInt(parts[5]),
+              exercisePrice: parseFloat(parts[6]),
+              exerciseRatio: parseFloat(parts[7]),
+              daysLeft: parseInt(parts[8]),
+              priceStatus: parts[9],
+              spreadRatio: parts[10].trim() === '--' ? null : parseFloat(parts[10]),
+              leverage: parseFloat(parts[11]),
+              impliedVol: parseFloat(parts[12]),
+              floatingRatio: parts[13] ? parseFloat(parts[13]) : 0
+            };
+            warrants.push(warrant);
+          } catch (e) {
+            console.error('解析多行格式失敗:', chunk, e);
+          }
+        }
+      }
+
+      return warrants;
+    }
+
+    function calculateMetrics(warrant) {
+      const volumeScore = Math.min((warrant.volume / 1000) * 100, 100);
+      const ms = (warrant.changePercent * 0.4) + (warrant.leverage * 0.3) + (warrant.impliedVol * 0.2) + (volumeScore * 0.1);
+      const vr = (warrant.leverage / warrant.impliedVol) * (100 / (warrant.spreadRatio || 5)) * (warrant.daysLeft / 30);
+      const tr = (warrant.impliedVol * 2) / (warrant.daysLeft + 1) + ((warrant.spreadRatio || 5) * 0.5);
+      const pt = warrant.price * (1 + warrant.changePercent * warrant.leverage * 0.007 - tr * 0.01);
+      const sl = warrant.price * (1 - ((warrant.spreadRatio || 5) * 2 + 2.5 + warrant.impliedVol / warrant.daysLeft) / 100) * 0.95;
+      return { ms, vr, tr, pt, sl };
+    }
+
+    function calculateLiquidityScore(warrant) {
+      let volumeScore = 0;
+      if (warrant.volume > 1000) volumeScore = 100;
+      else if (warrant.volume >= 100) volumeScore = 50;
+      else volumeScore = 10;
+
+      let spreadScore = 50;
+      if (warrant.spreadRatio !== null) {
+        if (warrant.spreadRatio < 3) spreadScore = 100;
+        else if (warrant.spreadRatio <= 5) spreadScore = 70;
+        else spreadScore = 30;
+      }
+
+      let floatingRatioScore = 0;
+      if (warrant.floatingRatio >= 1 && warrant.floatingRatio <= 90) floatingRatioScore = 100;
+      else if (warrant.floatingRatio > 90) floatingRatioScore = 20;
+      else if (warrant.floatingRatio < 1) floatingRatioScore = 30;
+
+      const marketMakerScore = (warrant.spreadRatio !== null) ? 100 : 50;
+      const ls = (volumeScore * 0.35) + (spreadScore * 0.25) + (floatingRatioScore * 0.25) + (marketMakerScore * 0.15);
+      return ls;
+    }
+
+    function getQualityScore(warrant, metrics, liquidityScore, considerLiquidity) {
+      let score = 0;
+      if (considerLiquidity) {
+        score += (liquidityScore / 100) * 45;
+      }
+      if (warrant.impliedVol < 50) score += 20;
+      else if (warrant.impliedVol < 70) score += 10;
+      if (warrant.daysLeft > 45) score += 15;
+      else if (warrant.daysLeft > 30) score += 10;
+      if (metrics.vr > 1.5) score += 20;
+      else if (metrics.vr > 1.0) score += 10;
+      return Math.min(Math.round(score), 100);
+    }
+
+    function getRecommendation(warrant, metrics, score, liquidityScore, considerLiquidity) {
+      if (considerLiquidity && liquidityScore < 50) {
+        return { type: 'avoid', text: '❌ 不推薦', reason: '綜合流動性評分過低' };
+      }
+      if (!warrant.spreadRatio) {
+        return { type: 'avoid', text: '❌ 不推薦', reason: '數據不完整 (買賣價差缺失)' };
+      }
+      if (warrant.impliedVol > 80) {
+        return { type: 'avoid', text: '❌ 迴避', reason: '隱波極高，時間衰減風險大' };
+      }
+      if (warrant.changePercent < -20) {
+        return { type: 'hold', text: '⏳ 觀望', reason: '當日下跌過深，等待反彈信號' };
+      }
+      if (score >= 70) {
+        return { type: 'buy', text: '✅ 買入', reason: '綜合評分優秀，可考慮進場' };
+      }
+      if (score >= 50) {
+        return { type: 'hold', text: '⏳ 觀望', reason: '條件一般，等待更好機會' };
+      }
+      return { type: 'avoid', text: '❌ 迴避', reason: '綜合評分不佳' };
+    }
+
+    function formatNumber(num, decimals = 2) {
+      if (num === null || num === undefined) return '--';
+      return num.toFixed(decimals);
+    }
+
+    function getScoreClass(score) {
+      if (score >= 80) return 'score-excellent';
+      if (score >= 60) return 'score-good';
+      if (score >= 40) return 'score-warning';
+      return 'score-danger';
+    }
+
+    async function analyzeData() {
+      const input = document.getElementById('dataInput').value;
+      const resultsContainer = document.getElementById('resultsContainer');
+      const messageContainer = document.getElementById('messageContainer');
+      const analysisResults = document.getElementById('analysisResults');
+
+      messageContainer.innerHTML = '';
+      analysisResults.innerHTML = '';
+      resultsContainer.classList.remove('active');
+
+      if (!input.trim()) {
+        messageContainer.innerHTML = '<div class="error-message">❌ 請輸入權證資料</div>';
+        resultsContainer.classList.add('active');
+        return;
+      }
+
+      analysisResults.innerHTML = '<div class="loading"><div class="spinner"></div>正在分析中...</div>';
+      resultsContainer.classList.add('active');
+
+      setTimeout(async () => {
+        try {
+          const warrants = parseWarrantData(input);
+          if (warrants.length === 0) {
+            messageContainer.innerHTML = '<div class="error-message">❌ 無法解析資料，請檢查格式</div>';
+            analysisResults.innerHTML = '';
+            return;
+          }
+
+          messageContainer.innerHTML = `<div class="success-message">✅ 成功解析 ${warrants.length} 檔權證</div>`;
+          
+          const considerLiquidity = document.getElementById('considerLiquidity').checked;
+          const analysis = warrants.map(w => {
+            const metrics = calculateMetrics(w);
+            const liquidityScore = calculateLiquidityScore(w);
+            const score = getQualityScore(w, metrics, liquidityScore, considerLiquidity);
+            const recommendation = getRecommendation(w, metrics, score, liquidityScore, considerLiquidity);
+            return { warrant: w, metrics, score, liquidityScore, recommendation };
+          });
+
+          // --- 新增：儲存資料到 Supabase ---
+          if (supabaseClient) {
+            const recordsToInsert = analysis.map(item => ({
+              warrant_code: item.warrant.code,
+              warrant_name: item.warrant.name,
+              score: item.score,
+              liquidity_score: item.liquidityScore,
+              recommendation: item.recommendation.text,
+              raw_data: item.warrant
+            }));
+
+            const { data, error } = await supabaseClient
+              .from('analysis_records')
+              .insert(recordsToInsert)
+              .select();
+
+            if (error) {
+              console.error('Error saving to Supabase:', error);
+              messageContainer.innerHTML += `<div class="error-message">❌ 儲存分析結果到雲端失敗: ${error.message}</div>`;
+            } else {
+              console.log('Successfully saved to Supabase:', data);
+              messageContainer.innerHTML += '<div class="success-message">☁️ 分析結果已成功儲存至雲端</div>';
+            }
+          }
+          // --- 結束 ---
+
+          tableData = analysis;
+          sortState = { key: 'score', direction: 'desc' };
+          sortTableData();
+
+          let html = generateComparisonTable(tableData);
+          html += generateDetailedAnalysis(tableData);
+          html += generateRanking(tableData);
+          html += generateSummary(tableData);
+
+          analysisResults.innerHTML = html;
+          initTableSorting();
+          updateHeaderStyles();
+
+        } catch (error) {
+          messageContainer.innerHTML = `<div class="error-message">❌ 分析出錯: ${error.message}</div>`;
+          analysisResults.innerHTML = '';
+          console.error(error);
+        }
+      }, 500);
+    }
+
+    function getNestedValue(obj, path) {
+      return path.split('.').reduce((acc, part) => acc && acc[part], obj);
+    }
+
+    function sortTableData() {
+      tableData.sort((a, b) => {
+        const valA = getNestedValue(a, sortState.key);
+        const valB = getNestedValue(b, sortState.key);
+
+        if (valA === null || valA === undefined) return 1;
+        if (valB === null || valB === undefined) return -1;
+        
+        let comparison = 0;
+        if (typeof valA === 'string') {
+          comparison = valA.localeCompare(valB, 'zh-Hant');
+        } else {
+          if (valA > valB) comparison = 1;
+          else if (valA < valB) comparison = -1;
+        }
+        
+        return sortState.direction === 'desc' ? comparison * -1 : comparison;
+      });
+    }
+
+    function renderTableBody() {
+      const tableBody = document.getElementById('comparisonTableBody');
+      if (!tableBody) return;
+      let html = '';
+      for (const item of tableData) {
+        html += generateTableRow(item);
+      }
+      tableBody.innerHTML = html;
+    }
+
+    function updateHeaderStyles() {
+      document.querySelectorAll('.sortable-header').forEach(header => {
+        header.classList.remove('sorted-asc', 'sorted-desc');
+        if (header.dataset.sort === sortState.key) {
+          header.classList.add(sortState.direction === 'asc' ? 'sorted-asc' : 'sorted-desc');
+        }
+      });
+    }
+
+    function initTableSorting() {
+      const headers = document.querySelectorAll('.sortable-header');
+      headers.forEach(header => {
+        header.addEventListener('click', () => {
+          const sortKey = header.dataset.sort;
+          if (sortState.key === sortKey) {
+            sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+          } else {
+            sortState.key = sortKey;
+            sortState.direction = 'desc';
+          }
+          sortTableData();
+          renderTableBody();
+          updateHeaderStyles();
+        });
+      });
+    }
+
+    function generateTableRow({ warrant, score, liquidityScore, recommendation }) {
+      const changeClass = warrant.changePercent >= 0 ? 'up' : 'down';
+      const recClass = recommendation.type === 'buy' ? 'score-excellent' :
+                      recommendation.type === 'hold' ? 'score-good' :
+                      'score-danger';
+      return `
+        <tr>
+          <td class="warrant-code">${warrant.code}</td>
+          <td class="warrant-name">${warrant.name}</td>
+          <td>${formatNumber(warrant.price, 2)}</td>
+          <td class="${changeClass}">${formatNumber(warrant.changePercent, 2)}%</td>
+          <td>${warrant.volume}</td>
+          <td>${formatNumber(warrant.impliedVol, 2)}</td>
+          <td>${formatNumber(warrant.leverage, 2)}</td>
+          <td>${warrant.daysLeft}</td>
+          <td><span class="${getScoreClass(liquidityScore)}">${formatNumber(liquidityScore, 0)}</span></td>
+          <td><span class="${getScoreClass(score)}">${formatNumber(score, 0)}</span></td>
+          <td><span class="${recClass}">${recommendation.text}</span></td>
+        </tr>
+      `;
+    }
+
+    function generateComparisonTable(analysis) {
+      let bodyHtml = '';
+      for (const item of analysis) {
+        bodyHtml += generateTableRow(item);
+      }
+      return `
+        <div class="card">
+          <h3>📊 快速評分對比</h3>
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th class="sortable-header" data-sort="warrant.code">代碼</th>
+                <th class="sortable-header" data-sort="warrant.name">權證名稱</th>
+                <th class="sortable-header" data-sort="warrant.price">成交價</th>
+                <th class="sortable-header" data-sort="warrant.changePercent">漲跌幅</th>
+                <th class="sortable-header" data-sort="warrant.volume">成交量</th>
+                <th class="sortable-header" data-sort="warrant.impliedVol">隱波%</th>
+                <th class="sortable-header" data-sort="warrant.leverage">實質槓桿</th>
+                <th class="sortable-header" data-sort="warrant.daysLeft">剩餘天數</th>
+                <th class="sortable-header" data-sort="liquidityScore">流動性評分</th>
+                <th class="sortable-header" data-sort="score">綜合評分</th>
+                <th>建議</th>
+              </tr>
+            </thead>
+            <tbody id="comparisonTableBody">
+              ${bodyHtml}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function generateDetailedAnalysis(analysis) {
+      let html = '';
+      for (const { warrant, metrics, score, liquidityScore, recommendation } of analysis) {
+        const cardClass = recommendation.type === 'buy' ? 'excellent' : recommendation.type === 'hold' ? 'warning' : 'danger';
+        const recClass = recommendation.type === 'buy' ? 'rec-buy' : recommendation.type === 'hold' ? 'rec-hold' : 'rec-avoid';
+
+        html += `
+          <div class="card ${cardClass}">
+            <h3>${recommendation.text} ${warrant.code} ${warrant.name}</h3>
+            <div class="metric-row">
+              <div class="metric-item"><div class="metric-label">綜合評分</div><div class="metric-value">${formatNumber(score, 0)}</div></div>
+              <div class="metric-item"><div class="metric-label">流動性評分</div><div class="metric-value">${formatNumber(liquidityScore, 0)}</div></div>
+              <div class="metric-item"><div class="metric-label">隱波%</div><div class="metric-value">${formatNumber(warrant.impliedVol, 2)}%</div></div>
+              <div class="metric-item"><div class="metric-label">實質槓桿</div><div class="metric-value">${formatNumber(warrant.leverage, 2)}倍</div></div>
+            </div>
+
+            <table class="detail-table">
+              <tr><th>評估項目</th><th>數值</th><th>評價</th><th>說明</th></tr>
+              <tr>
+                <td>流動性 (成交量)</td>
+                <td>${warrant.volume}張</td>
+                <td>${warrant.volume > 1000 ? '<span class="score-excellent">優秀</span>' : warrant.volume > 500 ? '<span class="score-good">尚可</span>' : '<span class="score-danger">極差</span>'}</td>
+                <td>${warrant.volume > 1000 ? '成交量充足，進出容易' : warrant.volume > 500 ? '成交量一般' : '成交量不足，進出困難'}</td>
+              </tr>
+              <tr>
+                <td>買賣價差</td>
+                <td>${warrant.spreadRatio ? formatNumber(warrant.spreadRatio, 2) + '%' : '--'}</td>
+                <td>${warrant.spreadRatio ? (warrant.spreadRatio < 3 ? '<span class="score-excellent">優秀</span>' : warrant.spreadRatio < 5 ? '<span class="score-good">尚可</span>' : '<span class="score-warning">偏高</span>') : '無數據'}</td>
+                <td>${warrant.spreadRatio ? (warrant.spreadRatio < 3 ? '價差小，交易成本低' : warrant.spreadRatio < 5 ? '價差中等' : '價差大，交易成本高') : '無法判斷'}</td>
+              </tr>
+              <tr>
+                <td>隱波水位</td>
+                <td>${formatNumber(warrant.impliedVol, 2)}%</td>
+                <td>${warrant.impliedVol < 50 ? '<span class="score-excellent">低</span>' : warrant.impliedVol < 70 ? '<span class="score-good">中</span>' : '<span class="score-danger">高</span>'}</td>
+                <td>${warrant.impliedVol < 50 ? '隱波低，時間衰減慢' : warrant.impliedVol < 70 ? '隱波中等' : '隱波高，時間衰減快'}</td>
+              </tr>
+              <tr>
+                <td>槓桿效應</td>
+                <td>${formatNumber(warrant.leverage, 2)}倍</td>
+                <td>${warrant.leverage > 10 ? '<span class="score-warning">高</span>' : warrant.leverage > 5 ? '<span class="score-good">適中</span>' : '<span class="score-excellent">低</span>'}</td>
+                <td>${warrant.leverage > 10 ? '槓桿高，風險大' : warrant.leverage > 5 ? '槓桿適中，風險可控' : '槓桿低，風險小'}</td>
+              </tr>
+              <tr>
+                <td>時間價值</td>
+                <td>${warrant.daysLeft}天</td>
+                <td>${warrant.daysLeft > 60 ? '<span class="score-excellent">充足</span>' : warrant.daysLeft > 30 ? '<span class="score-good">適中</span>' : '<span class="score-warning">緊張</span>'}</td>
+                <td>${warrant.daysLeft > 60 ? '時間充足' : warrant.daysLeft > 30 ? '時間適中' : '時間緊張，需注意衰減'}</td>
+              </tr>
+            </table>
+
+            <div class="formula-result">
+              <div class="formula-title">🔢 動能強度評分 (MS)</div>
+              <div class="formula-value">MS = ${formatNumber(metrics.ms, 2)}</div>
+            </div>
+            <div class="formula-result">
+              <div class="formula-title">💰 價值性價比 (VR)</div>
+              <div class="formula-value">VR = ${formatNumber(metrics.vr, 2)}</div>
+            </div>
+            <div class="formula-result">
+              <div class="formula-title">⏰ 時間衰減風險 (TR)</div>
+              <div class="formula-value">TR = ${formatNumber(metrics.tr, 2)}</div>
+            </div>
+
+            <div class="recommendation ${recClass}">
+              <strong>${recommendation.text}</strong><br>
+              ${recommendation.reason}
+            </div>
+          </div>
+        `;
+      }
+      return html;
+    }
+
+    function generateRanking(analysis) {
+      if (analysis.length < 2) return '';
+      const byLiquidity = [...analysis].sort((a, b) => b.liquidityScore - a.liquidityScore);
+      const byLeverage = [...analysis].sort((a, b) => b.warrant.leverage - a.warrant.leverage);
+      const byImpliedVol = [...analysis].sort((a, b) => a.warrant.impliedVol - b.warrant.impliedVol);
+      return `
+        <div class="card">
+          <h3>🏆 排名對比</h3>
+          <div class="ranking">
+            <div class="rank-item">
+              <div class="rank-title">流動性評分排名</div>
+              <div class="rank-value">1️⃣ ${byLiquidity[0].warrant.code}</div>
+              <div class="rank-note">${formatNumber(byLiquidity[0].liquidityScore, 0)}分</div>
+            </div>
+            <div class="rank-item">
+              <div class="rank-title">槓桿排名</div>
+              <div class="rank-value">1️⃣ ${byLeverage[0].warrant.code}</div>
+              <div class="rank-note">${formatNumber(byLeverage[0].warrant.leverage, 2)}倍</div>
+            </div>
+            <div class="rank-item">
+              <div class="rank-title">隱波排名</div>
+              <div class="rank-value">1️⃣ ${byImpliedVol[0].warrant.code}</div>
+              <div class="rank-note">${formatNumber(byImpliedVol[0].warrant.impliedVol, 2)}%</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function generateSummary(analysis) {
+      if (analysis.length === 0) return '';
+      const best = analysis[0];
+      const worst = analysis[analysis.length - 1];
+      return `
+        <div class="card">
+          <h3>💡 綜合建議</h3>
+          <h4 style="color: #27ae60; margin: 15px 0 10px 0;">✅ 優先選擇</h4>
+          <p style="line-height: 1.8; color: #555; margin-bottom: 15px;">
+            <strong>${best.warrant.code} ${best.warrant.name}</strong><br>
+            綜合評分: ${formatNumber(best.score, 0)}分 | 
+            流動性評分: ${formatNumber(best.liquidityScore, 0)}分 | 
+            性價比: ${formatNumber(best.metrics.vr, 2)}
+          </p>
+          <h4 style="color: #e74c3c; margin: 15px 0 10px 0;">❌ 應避免</h4>
+          <p style="line-height: 1.8; color: #555; margin-bottom: 15px;">
+            <strong>${worst.warrant.code} ${worst.warrant.name}</strong><br>
+            綜合評分: ${formatNumber(worst.score, 0)}分 | 
+            流動性評分: ${formatNumber(worst.liquidityScore, 0)}分 | 
+            原因: ${worst.recommendation.reason}
+          </p>
+          <h4 style="color: #2c3e50; margin: 15px 0 10px 0;">⚠️ 風險提示</h4>
+          <ul style="line-height: 2; color: #555; margin-left: 20px;">
+            <li>🔴 優先選擇成交量>1000張的權證</li>
+            <li>🔴 買賣價差<5%為交易前提</li>
+            <li>🔴 短期持倉控制在1-5天內</li>
+            <li>🔴 單筆虧損不超過帳戶資金的2%</li>
+            <li>🔴 避免在隱波極端高位(>80%)進場</li>
+            <li>🔴 剩餘天數<15天的權證謹慎交易</li>
+          </ul>
+        </div>
+      `;
+    }
+
+    function clearData() {
+      document.getElementById('dataInput').value = '';
+      document.getElementById('resultsContainer').classList.remove('active');
+      document.getElementById('analysisResults').innerHTML = '';
+      document.getElementById('messageContainer').innerHTML = '';
+      tableData = [];
+    }
+
+    window.addEventListener('load', () => {
+      console.log('權證分析系統已就緒');
+    });
+  </script>
+</body>
+</html>
